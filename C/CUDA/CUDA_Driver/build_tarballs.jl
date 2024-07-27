@@ -9,24 +9,20 @@ using BinaryBuilder, Pkg
 include("../../../fancy_toys.jl")
 
 name = "CUDA_Driver"
-version = v"0.7"
+version = v"0.9.1"
 
-cuda_version = v"12.3"
+cuda_version = v"12.5"
 cuda_version_str = "$(cuda_version.major)-$(cuda_version.minor)"
-driver_version_str = "545.23.06"
+driver_version_str = "555.42.06"
 build = 1
 
 sources_linux_x86 = [
     FileSource("https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-compat-$(cuda_version_str)-$(driver_version_str)-$(build).x86_64.rpm",
-               "04167d1f1fd1eab887c7ea512f779a0de5c32f6c6b66ab2e840c7548621aa1d9", "compat.rpm")
-]
-sources_linux_ppc64le = [
-    FileSource("https://developer.download.nvidia.com/compute/cuda/repos/rhel8/ppc64le/cuda-compat-$(cuda_version_str)-$(driver_version_str)-$(build).ppc64le.rpm",
-               "cd8f0bb34757063b2c5eb0fc901a6bf0740a173ac2048d71c8ba4dda05818aef", "compat.rpm")
+               "66d63219c926733ecd641a709d98a5cb7406712af000d141d0c23d08e0bdb88b", "compat.rpm")
 ]
 sources_linux_aarch64 = [
     FileSource("https://developer.download.nvidia.com/compute/cuda/repos/rhel8/sbsa/cuda-compat-$(cuda_version_str)-$(driver_version_str)-$(build).aarch64.rpm",
-               "b0d2fffbbd30e048844c5b4cef495c85f5abd210084d896bf93f2193cf1f060a", "compat.rpm")
+               "600d86e143b9fa97ec7862ff634210cacf072ce709c738ee322c932b763ab138", "compat.rpm")
 ]
 
 dependencies = []
@@ -69,17 +65,11 @@ non_reg_ARGS = filter(arg -> arg != "--register", ARGS)
 if should_build_platform("x86_64-linux-gnu")
     build_tarballs(non_reg_ARGS, name, version, sources_linux_x86, script,
                    [Platform("x86_64", "linux")], products, dependencies;
-                   lazy_artifacts=true, skip_audit=true, init_block)
-end
-
-if should_build_platform("powerpc64le-linux-gnu")
-    build_tarballs(non_reg_ARGS, name, version, sources_linux_ppc64le, script,
-                   [Platform("powerpc64le", "linux")], products, dependencies;
-                   lazy_artifacts=true, skip_audit=true, init_block)
+                   skip_audit=true, init_block)
 end
 
 if should_build_platform("aarch64-linux-gnu")
     build_tarballs(ARGS, name, version, sources_linux_aarch64, script,
                    [Platform("aarch64", "linux")], products, dependencies;
-                   lazy_artifacts=true, skip_audit=true, init_block)
+                   skip_audit=true, init_block)
 end

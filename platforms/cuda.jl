@@ -73,8 +73,34 @@ const augment = """
         end
         BinaryPlatforms.set_compare_strategy!(platform, "cuda", cuda_comparison_strategy)
 
-        # store the fact that we're using a local CUDA toolkit, for debugging purposes
-        platform["cuda_local"] = string(local_toolkit)
+        return platform
+    end"""
+
+# a special version of the platform augmentation block that only sets "cuda_platform"
+# (for use with packages that only ship a single version and don't depend on the runtime)
+# XXX: keep in sync with CUDA_Runtime_jll's platform augmentation
+const platform_augment = """
+    function is_tegra()
+        if isfile("/etc/nv_tegra_release")
+            return true
+        end
+        if isfile("/proc/device-tree/compatible") &&
+            contains(read("/proc/device-tree/compatible", String), "tegra")
+            return true
+        end
+        return false
+    end
+
+    function augment_platform!(platform::Platform)
+        haskey(platform, "cuda_platform") && return platform
+
+        if Sys.islinux() && arch(platform) == "aarch64"
+            platform["cuda_platform"] = if is_tegra()
+                "jetson"
+            else
+                "sbsa"
+            end
+        end
 
         return platform
     end"""
@@ -87,6 +113,7 @@ platform(cuda::String) = cuda
 # BinaryBuilder.jl currently does not allow selecting a BuildDependency by compat,
 # so we need the full version for CUDA_SDK_jll (JuliaPackaging/BinaryBuilder.jl#/1212).
 const cuda_full_versions = [
+    v"10.2.89",
     v"11.4.4",
     v"11.5.2",
     v"11.6.2",
@@ -95,8 +122,11 @@ const cuda_full_versions = [
     v"12.0.1",
     v"12.1.1",
     v"12.2.2",
-    v"12.3.0",
+    v"12.3.2",
+    v"12.4.1",
+    v"12.5.1",
 ]
+
 function full_version(ver::VersionNumber)
     ver == Base.thisminor(ver) || error("Cannot specify a patch version")
     for full_ver in cuda_full_versions
@@ -108,25 +138,51 @@ function full_version(ver::VersionNumber)
 end
 
 """
-    supported_platforms()
+    supported_platforms(; <keyword arguments>)
 
 Return a list of supported platforms to build CUDA artifacts for.
+
+# Arguments
+- `min_version=v"11"`: Min. CUDA version to target.
+- `max_version=nothing`: Max. CUDA version to target.
 """
-function supported_platforms()
+function supported_platforms(; min_version=v"11", max_version=nothing)
     base_platforms = [
         Platform("x86_64", "linux"; libc = "glibc"),
-        Platform("aarch64", "linux"; libc = "glibc"),
-        Platform("powerpc64le", "linux"; libc = "glibc"),
+        Platform("aarch64", "linux"; libc = "glibc", cuda_platform="jetson"),
+        Platform("aarch64", "linux"; libc = "glibc", cuda_platform="sbsa"),
 
         # nvcc isn't a cross compiler, so incompatible with BinaryBuilder
         #Platform("x86_64", "windows"),
     ]
 
+    cuda_versions = filter(v -> (isnothing(min_version) || v >= min_version) &&
+                                (isnothing(max_version) || v <= max_version),
+                           cuda_full_versions)
+
     # augment with CUDA versions
     platforms = Platform[]
-    for version in cuda_full_versions
+    for version in cuda_versions
         for base_platform in base_platforms
             platform = deepcopy(base_platform)
+
+            if arch(platform) == "aarch64"
+                # CUDA 10.x: our CUDA 10.2 build recipe for arm64 only provides jetson binaries
+                if Base.thisminor(version) == v"10.2" && platform["cuda_platform"] != "jetson"
+                    continue
+                end
+
+                # CUDA 11.x: only 11.8 has jetson binaries on the redist server
+                if v"11.0" <= Base.thisminor(version) < v"11.8" && platform["cuda_platform"] == "jetson"
+                    continue
+                end
+
+                # CUDA 12.x: the jetson binaries for 12.3 seem to be missing
+                if Base.thisminor(version) == v"12.3" && platform["cuda_platform"] == "jetson"
+                    continue
+                end
+            end
+
             platform["cuda"] = "$(version.major).$(version.minor)"
             push!(platforms, platform)
         end
@@ -145,7 +201,7 @@ only ever be used if there is _also_ a CUDA-enabled build available.
 function is_supported(platform)
     if Sys.islinux(platform)
         return arch(platform) in ["x86_64", "aarch64", "powerpc64le"]
-    elseif is Sys.iswindows(platform)
+    elseif Sys.iswindows(platform)
         # see note in `supported_platforms()`
         return false
     else

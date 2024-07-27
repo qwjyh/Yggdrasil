@@ -3,11 +3,11 @@
 using BinaryBuilder, Pkg
 
 name = "Typst"
-version = v"0.8.0"
+version = v"0.11.1"
 
 # Collection of sources required to complete build
 sources = [
-    GitSource("https://github.com/typst/typst.git", "360cc9b9570f263d52530b98d0c93523e7bdb100")
+    GitSource("https://github.com/typst/typst.git", "5011510270c2c23f0ab019af486b26db0d62261b")
 ]
 
 # Bash recipe for building across all platforms
@@ -30,9 +30,11 @@ products = [
 ]
 
 # Dependencies that must be installed before this package can be built
-dependencies = Dependency[
+dependencies = [
+    Dependency("OpenSSL_jll"; compat="3.0.8"),
 ]
 
 # Build the tarballs, and possibly a `build.jl` as well.
 build_tarballs(ARGS, name, version, sources, script, platforms, products, dependencies;
-               julia_compat="1.6", compilers=[:rust, :c], lock_microarchitecture=false)
+               julia_compat="1.6", compilers=[:rust, :c], lock_microarchitecture=false,
+               preferred_gcc_version = v"5")

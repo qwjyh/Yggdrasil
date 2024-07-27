@@ -7,12 +7,12 @@ const YGGDRASIL_DIR = "../.."
 include(joinpath(YGGDRASIL_DIR, "fancy_toys.jl"))
 
 name = "NEO"
-version = v"23.30.26918"#.9
+version = v"24.22.29735"#.20
 
 # Collection of sources required to build this package.
 sources = [
     GitSource("https://github.com/intel/compute-runtime.git",
-              "6d516e54b2c3d920e371f8622980fa911621fa59"),
+              "7131387cdbb02d480a225c70daef913a6c024a6e"),
 ]
 
 # Bash recipe for building across all platforms
@@ -20,6 +20,10 @@ function get_script(; debug::Bool)
     raw"""
         cd compute-runtime
         install_license LICENSE.md
+
+        # revert a change that breaks the cxx03 build
+        # https://github.com/intel/compute-runtime/issues/708
+        git revert 18c25e5aa3fc00c7d47469713adeace08a9aec07
 
         # work around compilation failures
         ## already defined in gmmlib
@@ -83,9 +87,9 @@ products = [
 #       when using a non-public release, refer to the compiled manifest
 #       https://github.com/intel/compute-runtime/blob/master/manifests/manifest.yml.
 dependencies = [
-    Dependency("gmmlib_jll"; compat="=22.3.0"),
-    Dependency("libigc_jll"; compat="=1.0.14828"),
-    Dependency("oneAPI_Level_Zero_Headers_jll", v"1.7.0"; compat="1.7.0"),
+    Dependency("gmmlib_jll"; compat="=22.3.19"),
+    Dependency("libigc_jll"; compat="=1.0.16695"),
+    Dependency("oneAPI_Level_Zero_Headers_jll"; compat="=1.9.2"),
 ]
 
 augment_platform_block = raw"""
